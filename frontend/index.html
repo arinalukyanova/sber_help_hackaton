@@ -9,7 +9,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>SberTech AI Support</title>
+    <title>SberHelp</title>
 
     <link
         rel="stylesheet"
@@ -17,85 +17,56 @@
     >
 </head>
 
+<body>
 
-<body class="login-page">
+    <div class="app">
 
-    <div class="login-wrapper">
+        <!-- ШАПКА -->
 
-        <div class="login-card">
+        <header class="header">
 
             <div class="brand">
 
                 <img
                     src="assets/logo.png"
-                    alt="SberTech"
+                    alt="SberHelp"
                     class="brand-logo"
                     onerror="this.style.display='none'"
                 >
 
-                <div>
-                    <div class="brand-title">
-                        SberTech AI Support
-                    </div>
+                <span class="brand-dot">
+                    ✦
+                </span>
 
-                    <div class="brand-subtitle">
-                        Интеллектуальный диспетчер обращений
-                    </div>
-                </div>
+                <span class="brand-name">
+                    SberHelp
+                </span>
 
             </div>
 
 
-            <div class="login-content">
+            <button
+                class="profile-button"
+                type="button"
+                aria-label="Профиль"
+            >
+                ○
+            </button>
 
-                <div class="badge">
-                    AI SUPPORT SYSTEM
-                </div>
-
-                <h1>
-                    Добро пожаловать
-                </h1>
-
-                <p>
-                    Система автоматически анализирует обращения,
-                    выделяет несколько проблем, определяет приоритет
-                    и предлагает следующее действие.
-                </p>
+        </header>
 
 
-                <label for="operatorName">
-                    Имя оператора
-                </label>
+        <!-- СЮДА JS БУДЕТ ВСТАВЛЯТЬ ЭКРАНЫ -->
 
-                <input
-                    id="operatorName"
-                    class="input"
-                    type="text"
-                    placeholder="Например: Анна"
-                >
-
-
-                <button
-                    id="loginButton"
-                    class="primary-button"
-                >
-                    Войти в систему
-                </button>
-
-
-                <p
-                    id="loginError"
-                    class="error-text"
-                ></p>
-
-            </div>
-
-        </div>
+        <main
+            id="screen"
+            class="screen"
+        ></main>
 
     </div>
 
 
-    <script src="js/auth.js"></script>
+    <script src="js/chat.js"></script>
 
 </body>
 

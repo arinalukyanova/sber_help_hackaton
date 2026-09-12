@@ -1,20 +1,17 @@
 // ======================================================
 // SberHelp
-// Основная логика frontend
+// FRONTEND
 // ======================================================
 
-
-// ------------------------------------------------------
-// DOM
-// ------------------------------------------------------
 
 const screen =
     document.getElementById("screen");
 
 
-// ------------------------------------------------------
-// СОСТОЯНИЕ ПРИЛОЖЕНИЯ
-// ------------------------------------------------------
+// ======================================================
+// СОСТОЯНИЕ
+// ======================================================
+
 
 const state = {
 
@@ -22,52 +19,137 @@ const state = {
 
     currentQuestion: 0,
 
+    questions: [],
+
     answers: [
         "",
         "",
         ""
     ],
 
-    confirmedProblem: false
+    summary: "",
+
+    solution: [],
+
+    status: ""
+
 };
 
 
-// ------------------------------------------------------
-// УТОЧНЯЮЩИЕ ВОПРОСЫ
-// ------------------------------------------------------
+// ======================================================
+// API
+// ======================================================
 
-const questions = [
 
-    {
-        title:
-            "На каком устройстве возникает проблема?",
+async function apiRequest(
+    url,
+    data
+) {
 
-        placeholder:
-            "Например: рабочий ноутбук Windows..."
-    },
+    const response = await fetch(
+        url,
+        {
+            method: "POST",
 
-    {
-        title:
-            "Когда проблема появилась впервые?",
+            headers: {
+                "Content-Type":
+                    "application/json"
+            },
 
-        placeholder:
-            "Например: сегодня утром после смены пароля..."
-    },
+            body: JSON.stringify(
+                data
+            )
+        }
+    );
 
-    {
-        title:
-            "Что именно происходит при попытке входа?",
 
-        placeholder:
-            "Например: появляется сообщение «Неверный пароль»..."
+    let result;
+
+    try {
+
+        result =
+            await response.json();
+
+    } catch {
+
+        throw new Error(
+            "Сервер вернул некорректный ответ"
+        );
     }
 
-];
+
+    if (!response.ok) {
+
+        throw new Error(
+            result.error ||
+            "Ошибка сервера"
+        );
+    }
+
+
+    return result;
+}
 
 
 // ======================================================
-// ЭКРАН 01 — START
+// ЗАЩИТА ТЕКСТА
 // ======================================================
+
+
+function escapeHtml(text) {
+
+    return String(text)
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
+}
+
+
+function formatMultiline(text) {
+
+    return escapeHtml(text)
+        .replaceAll(
+            "\n",
+            "<br>"
+        );
+}
+
+
+// ======================================================
+// СООБЩЕНИЕ ОБ ОШИБКЕ
+// ======================================================
+
+
+function showError(message) {
+
+    alert(
+        message ||
+        "Произошла ошибка"
+    );
+}
+
+
+// ======================================================
+// ЭКРАН 1
+// ======================================================
+
 
 function renderStart() {
 
@@ -136,7 +218,7 @@ function renderStart() {
 
     button.addEventListener(
         "click",
-        () => {
+        async () => {
 
             const value =
                 input.value.trim();
@@ -159,6 +241,65 @@ function renderStart() {
 
 
             renderAnalysis();
+
+
+            try {
+
+                const data =
+                    await apiRequest(
+                        "/api/analyze",
+                        {
+                            message:
+                                state.initialMessage
+                        }
+                    );
+
+
+                state.questions =
+                    data.questions || [];
+
+
+                if (
+                    state.questions.length === 0
+                ) {
+
+                    throw new Error(
+                        "Сервер не вернул вопросы"
+                    );
+                }
+
+
+                // Небольшая задержка нужна только
+                // для красивой анимации анализа.
+
+                setTimeout(
+                    () => {
+
+                        state.currentQuestion =
+                            0;
+
+                        renderQuestion();
+
+                    },
+                    600
+                );
+
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+
+
+                showError(
+                    "Не удалось выполнить анализ: " +
+                    error.message
+                );
+
+
+                renderStart();
+            }
         }
     );
 
@@ -176,8 +317,9 @@ function renderStart() {
 
 
 // ======================================================
-// ЭКРАН 02 — ANALYSIS
+// ЭКРАН 2 — АНАЛИЗ
 // ======================================================
+
 
 function renderAnalysis() {
 
@@ -200,7 +342,9 @@ function renderAnalysis() {
 
                     <div class="ai-orb">
 
-                        <div class="ai-orb-core"></div>
+                        <div
+                            class="ai-orb-core"
+                        ></div>
 
                     </div>
 
@@ -222,9 +366,13 @@ function renderAnalysis() {
                     </div>
 
 
-                    <div class="analysis-row muted-analysis">
+                    <div
+                        class="analysis-row muted-analysis"
+                    >
 
-                        <span class="loader-dot"></span>
+                        <span
+                            class="loader-dot"
+                        ></span>
 
                         <span>
                             Готовим уточняющие вопросы
@@ -239,32 +387,13 @@ function renderAnalysis() {
         </section>
 
     `;
-
-
-    /*
-        Здесь специально НЕТ:
-        "оцениваем сложность запроса"
-
-        Это та правка, которую ты попросила.
-    */
-
-
-    setTimeout(
-        () => {
-
-            state.currentQuestion = 0;
-
-            renderQuestion();
-
-        },
-        1800
-    );
 }
 
 
 // ======================================================
-// ЭКРАНЫ 03–05 — QUESTIONS
+// ЭКРАНЫ 3–5 — ВОПРОСЫ
 // ======================================================
+
 
 function renderQuestion() {
 
@@ -273,17 +402,31 @@ function renderQuestion() {
 
 
     const question =
-        questions[index];
+        state.questions[index];
+
+
+    if (!question) {
+
+        showError(
+            "Не удалось получить вопрос"
+        );
+
+        resetApplication();
+
+        return;
+    }
 
 
     screen.innerHTML = `
 
         <section class="page fade-in">
 
-            <div class="page-content question-page">
+            <div
+                class="page-content question-page"
+            >
 
                 <div class="question-counter">
-                    Вопрос ${index + 1}/3
+                    Вопрос ${index + 1}/${state.questions.length}
                 </div>
 
 
@@ -293,12 +436,10 @@ function renderQuestion() {
 
 
                 <p class="page-description">
-                    Ответ поможет ИИ точнее определить
+                    Ответ поможет точнее определить
                     причину проблемы.
                 </p>
 
-
-                <!-- ПЛАШКА С ВОПРОСОМ -->
 
                 <div class="question-card">
 
@@ -307,19 +448,21 @@ function renderQuestion() {
                     </div>
 
                     <div class="question-text">
-                        ${question.title}
+                        ${escapeHtml(question.title)}
                     </div>
 
                 </div>
 
 
-                <!-- ПОЛЕ ДЛЯ ОТВЕТА -->
-
                 <textarea
                     id="questionAnswer"
                     class="question-textarea"
-                    placeholder="${question.placeholder}"
-                >${state.answers[index]}</textarea>
+                    placeholder="${escapeHtml(
+                        question.placeholder || ""
+                    )}"
+                >${escapeHtml(
+                    state.answers[index] || ""
+                )}</textarea>
 
 
                 <button
@@ -351,7 +494,7 @@ function renderQuestion() {
 
     continueButton.addEventListener(
         "click",
-        () => {
+        async () => {
 
             const answer =
                 answerInput.value.trim();
@@ -374,16 +517,57 @@ function renderQuestion() {
 
 
             if (
-                state.currentQuestion < 2
+                state.currentQuestion <
+                state.questions.length - 1
             ) {
 
                 state.currentQuestion++;
 
                 renderQuestion();
 
-            } else {
+                return;
+            }
+
+
+            renderPreparingSummary();
+
+
+            try {
+
+                const data =
+                    await apiRequest(
+                        "/api/summary",
+                        {
+                            message:
+                                state.initialMessage,
+
+                            answers:
+                                state.answers
+                        }
+                    );
+
+
+                state.summary =
+                    data.summary;
+
 
                 renderConfirmation();
+
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+
+
+                showError(
+                    "Не удалось сформировать запрос: " +
+                    error.message
+                );
+
+
+                renderQuestion();
             }
         }
     );
@@ -402,8 +586,52 @@ function renderQuestion() {
 
 
 // ======================================================
-// ЭКРАН 06 — CONFIRM
+// ПОДГОТОВКА SUMMARY
 // ======================================================
+
+
+function renderPreparingSummary() {
+
+    screen.innerHTML = `
+
+        <section class="page fade-in">
+
+            <div class="page-content">
+
+                <h1 class="page-title">
+                    Формируем запрос
+                </h1>
+
+                <p class="page-description">
+                    Объединяем описание проблемы
+                    и ваши ответы.
+                </p>
+
+
+                <div class="ai-orb-wrapper">
+
+                    <div class="ai-orb">
+
+                        <div
+                            class="ai-orb-core"
+                        ></div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    `;
+}
+
+
+// ======================================================
+// ЭКРАН 6 — ПОДТВЕРЖДЕНИЕ
+// ======================================================
+
 
 function renderConfirmation() {
 
@@ -426,7 +654,9 @@ function renderConfirmation() {
                 </p>
 
 
-                <div class="problem-summary-card">
+                <div
+                    class="problem-summary-card"
+                >
 
                     <div class="summary-label">
                         Сформулированная проблема
@@ -434,17 +664,9 @@ function renderConfirmation() {
 
 
                     <div class="summary-text">
-
-                        Пользователь не может войти
-                        в рабочий аккаунт SberHelp
-                        на корпоративном компьютере
-                        после смены пароля.
-
-                        <br><br>
-
-                        При входе система сообщает
-                        об ошибке авторизации.
-
+                        ${formatMultiline(
+                            state.summary
+                        )}
                     </div>
 
 
@@ -493,7 +715,8 @@ function renderConfirmation() {
             "click",
             () => {
 
-                state.currentQuestion = 0;
+                state.currentQuestion =
+                    0;
 
                 renderQuestion();
             }
@@ -516,22 +739,153 @@ function renderConfirmation() {
         )
         .addEventListener(
             "click",
-            () => {
-
-                state.confirmedProblem =
-                    true;
-
-                renderAIAnswer();
-            }
+            getSolution
         );
 }
 
 
 // ======================================================
-// ЭКРАН 08 — AI ANSWER
+// ПОЛУЧЕНИЕ РЕШЕНИЯ
 // ======================================================
 
+
+async function getSolution() {
+
+    renderSolutionLoading();
+
+
+    try {
+
+        const data =
+            await apiRequest(
+                "/api/solution",
+                {
+                    message:
+                        state.initialMessage,
+
+                    answers:
+                        state.answers
+                }
+            );
+
+
+        state.solution =
+            data.solution || [];
+
+
+        state.status =
+            data.status || "";
+
+
+        if (
+            state.status ===
+            "ESCALATED"
+        ) {
+
+            renderSupport();
+
+            return;
+        }
+
+
+        renderAIAnswer();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        showError(
+            "Не удалось получить решение: " +
+            error.message
+        );
+
+
+        renderConfirmation();
+    }
+}
+
+
+// ======================================================
+// ЗАГРУЗКА РЕШЕНИЯ
+// ======================================================
+
+
+function renderSolutionLoading() {
+
+    screen.innerHTML = `
+
+        <section class="page fade-in">
+
+            <div class="page-content">
+
+                <h1 class="page-title">
+                    Подбираем решение
+                </h1>
+
+
+                <p class="page-description">
+                    Анализируем собранную информацию.
+                </p>
+
+
+                <div class="ai-orb-wrapper">
+
+                    <div class="ai-orb">
+
+                        <div
+                            class="ai-orb-core"
+                        ></div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    `;
+}
+
+
+// ======================================================
+// ЭКРАН РЕШЕНИЯ
+// ======================================================
+
+
 function renderAIAnswer() {
+
+    const items =
+        state.solution
+            .map(
+                (solution, index) => `
+
+                    <div
+                        class="solution-item"
+                    >
+
+                        <div
+                            class="solution-number"
+                        >
+                            ${index + 1}
+                        </div>
+
+                        <div
+                            class="solution-text"
+                        >
+                            ${escapeHtml(solution)}
+                        </div>
+
+                    </div>
+
+                `
+            )
+            .join("");
+
 
     screen.innerHTML = `
 
@@ -554,60 +908,7 @@ function renderAIAnswer() {
 
                 <div class="solution-list">
 
-
-                    <div class="solution-item">
-
-                        <div class="solution-number">
-                            1
-                        </div>
-
-                        <div class="solution-text">
-                            Завершите активные сессии
-                            в настройках безопасности
-                        </div>
-
-                    </div>
-
-
-                    <div class="solution-item">
-
-                        <div class="solution-number">
-                            2
-                        </div>
-
-                        <div class="solution-text">
-                            Подождите несколько минут
-                        </div>
-
-                    </div>
-
-
-                    <div class="solution-item">
-
-                        <div class="solution-number">
-                            3
-                        </div>
-
-                        <div class="solution-text">
-                            Попробуйте войти
-                            с новым паролем
-                        </div>
-
-                    </div>
-
-
-                    <div class="solution-item">
-
-                        <div class="solution-number">
-                            4
-                        </div>
-
-                        <div class="solution-text">
-                            Если ошибка сохранится —
-                            сбросьте кэш браузера
-                        </div>
-
-                    </div>
+                    ${items}
 
                 </div>
 
@@ -665,8 +966,9 @@ function renderAIAnswer() {
 
 
 // ======================================================
-// ЭКРАН 09 — SUCCESS
+// УСПЕШНО
 // ======================================================
+
 
 function renderSuccess() {
 
@@ -674,7 +976,9 @@ function renderSuccess() {
 
         <section class="page fade-in">
 
-            <div class="page-content success-page">
+            <div
+                class="page-content success-page"
+            >
 
                 <h1 class="page-title">
                     Рады, что помогли!
@@ -687,7 +991,9 @@ function renderSuccess() {
                 </p>
 
 
-                <div class="success-icon-wrapper">
+                <div
+                    class="success-icon-wrapper"
+                >
 
                     <div class="success-icon">
                         ✓
@@ -740,8 +1046,9 @@ function renderSuccess() {
 
 
 // ======================================================
-// ЭКРАН 10 — SUPPORT
+// ПОДДЕРЖКА
 // ======================================================
+
 
 function renderSupport() {
 
@@ -752,15 +1059,15 @@ function renderSupport() {
             <div class="page-content">
 
                 <h1 class="page-title">
-                    Запрос передан
-                    в поддержку
+                    Запрос подготовлен
+                    для поддержки
                 </h1>
 
 
                 <p class="page-description">
-                    Мы отправили специалисту уже
-                    подготовленный запрос вместе
-                    с собранной информацией.
+                    В демонстрационной версии
+                    запрос сформирован и готов
+                    для передачи специалисту.
                 </p>
 
 
@@ -772,7 +1079,7 @@ function renderSupport() {
                 <div class="support-card">
 
                     <div class="support-title">
-                        Что передано:
+                        Что подготовлено:
                     </div>
 
 
@@ -790,13 +1097,13 @@ function renderSupport() {
 
                     <div class="support-row">
                         ✓
-                        Технические детали
+                        Контекст обращения
                     </div>
 
 
                     <div class="support-row">
                         ✓
-                        Контекст обращения
+                        Результат первичного анализа
                     </div>
 
                 </div>
@@ -831,11 +1138,20 @@ function renderSupport() {
 // RESET
 // ======================================================
 
+
 function resetApplication() {
 
-    state.initialMessage = "";
+    state.initialMessage =
+        "";
 
-    state.currentQuestion = 0;
+
+    state.currentQuestion =
+        0;
+
+
+    state.questions =
+        [];
+
 
     state.answers = [
         "",
@@ -843,7 +1159,17 @@ function resetApplication() {
         ""
     ];
 
-    state.confirmedProblem = false;
+
+    state.summary =
+        "";
+
+
+    state.solution =
+        [];
+
+
+    state.status =
+        "";
 
 
     renderStart();
@@ -851,7 +1177,8 @@ function resetApplication() {
 
 
 // ======================================================
-// ЗАПУСК
+// СТАРТ
 // ======================================================
+
 
 renderStart();

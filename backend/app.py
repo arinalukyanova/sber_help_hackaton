@@ -1,184 +1,608 @@
-# ======================================================
-# SberHelp Backend (Flask)
-# ======================================================
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+from pathlib import Path
+from urllib.parse import urlparse
+import json
 
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import uuid
 
-app = Flask(__name__)
-CORS(app)  # разрешаем запросы с фронтенда
+# =========================================================
+# НАСТРОЙКИ
+# =========================================================
 
-# ======================================================
-# ХРАНИЛИЩЕ ЗАЯВОК В ПАМЯТИ
-# ======================================================
+HOST = "localhost"
+PORT = 8000
 
-tickets = {}
+BASE_DIR = Path(__file__).resolve().parent
 
-# ======================================================
-# ЗАГЛУШКА ДЛЯ LLM (потом заменишь на GigaChat/YandexGPT)
-# ======================================================
+FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
-def generate_questions(user_request: str):
-    """Возвращает 3 уточняющих вопроса."""
+# =========================================================
+# ЛОКАЛЬНАЯ ЛОГИКА "ИИ"
+#
+# Никаких сторонних библиотек здесь нет.
+# Это демонстрационная rule-based логика.
+# =========================================================
+
+
+def detect_category(message):
+    """
+    Определяем примерную категорию проблемы
+    по словам в сообщении пользователя.
+    """
+
+    text = message.lower()
+
+    if any(
+        word in text
+        for word in [
+            "пароль",
+            "войти",
+            "вход",
+            "авторизац",
+            "логин",
+            "аккаунт",
+        ]
+    ):
+        return "auth"
+
+    if any(
+        word in text
+        for word in [
+            "wi-fi",
+            "wifi",
+            "вайфай",
+            "интернет",
+            "сеть",
+        ]
+    ):
+        return "network"
+
+    if any(
+        word in text
+        for word in [
+            "vpn",
+            "впн",
+        ]
+    ):
+        return "vpn"
+
+    if any(
+        word in text
+        for word in [
+            "почта",
+            "письмо",
+            "outlook",
+            "email",
+            "e-mail",
+        ]
+    ):
+        return "mail"
+
+    if any(
+        word in text
+        for word in [
+            "принтер",
+            "печать",
+            "распечат",
+        ]
+    ):
+        return "printer"
+
+    return "other"
+
+
+def get_questions(message):
+    """
+    Возвращаем 3 уточняющих вопроса.
+    """
+
+    category = detect_category(message)
+
+    if category == "auth":
+        return [
+            {
+                "title": "На каком устройстве возникает проблема?",
+                "placeholder": "Например: рабочий ноутбук Windows..."
+            },
+            {
+                "title": "Когда проблема появилась впервые?",
+                "placeholder": "Например: сегодня после смены пароля..."
+            },
+            {
+                "title": "Что именно происходит при попытке входа?",
+                "placeholder": "Например: система пишет «Неверный пароль»..."
+            },
+        ]
+
+    if category == "network":
+        return [
+            {
+                "title": "На каком устройстве отсутствует подключение?",
+                "placeholder": "Например: рабочий ноутбук..."
+            },
+            {
+                "title": "Другие сайты или сервисы открываются?",
+                "placeholder": "Например: интернет полностью отсутствует..."
+            },
+            {
+                "title": "Что показывает значок подключения к сети?",
+                "placeholder": "Например: «Без доступа к интернету»..."
+            },
+        ]
+
+    if category == "vpn":
+        return [
+            {
+                "title": "На каком устройстве вы подключаетесь к VPN?",
+                "placeholder": "Например: рабочий ноутбук Windows..."
+            },
+            {
+                "title": "Подключение к обычному интернету работает?",
+                "placeholder": "Например: сайты открываются, но VPN не подключается..."
+            },
+            {
+                "title": "Какое сообщение об ошибке показывает VPN?",
+                "placeholder": "Напишите текст ошибки..."
+            },
+        ]
+
+    if category == "mail":
+        return [
+            {
+                "title": "Где возникает проблема с почтой?",
+                "placeholder": "Например: Outlook на рабочем ноутбуке..."
+            },
+            {
+                "title": "Письма не отправляются, не приходят или не открываются?",
+                "placeholder": "Опишите, что именно не работает..."
+            },
+            {
+                "title": "Появляется ли сообщение об ошибке?",
+                "placeholder": "Напишите текст ошибки, если он есть..."
+            },
+        ]
+
+    if category == "printer":
+        return [
+            {
+                "title": "Какой принтер вы используете?",
+                "placeholder": "Например: офисный принтер на 3 этаже..."
+            },
+            {
+                "title": "Принтер виден в списке устройств?",
+                "placeholder": "Например: виден, но документ не печатается..."
+            },
+            {
+                "title": "Что происходит после отправки документа на печать?",
+                "placeholder": "Например: документ остаётся в очереди..."
+            },
+        ]
+
     return [
-        "На каком устройстве возникает проблема?",
-        "Когда проблема появилась впервые?",
-        "Что именно происходит при попытке входа?"
+        {
+            "title": "На каком устройстве или в какой программе возникает проблема?",
+            "placeholder": "Например: рабочий ноутбук, браузер, приложение..."
+        },
+        {
+            "title": "Когда проблема появилась впервые?",
+            "placeholder": "Например: сегодня утром..."
+        },
+        {
+            "title": "Что именно происходит и есть ли сообщение об ошибке?",
+            "placeholder": "Опишите результат или текст ошибки..."
+        },
     ]
 
 
-def generate_summary(user_request: str, answers: list):
-    """Формирует резюме: 'Я правильно понял, что...'"""
-    summary = f"Я правильно понял, что ваш запрос: {user_request}."
-    if answers:
-        summary += " Уточнения: " + "; ".join(answers) + "."
-    return summary
-
-
-def can_solve(user_request: str) -> bool:
-    """Проверяет, может ли ИИ решить проблему."""
-    lower = user_request.lower()
-    return any(word in lower for word in ["пароль", "wi-fi", "почт", "вход"])
-
-
-def generate_solution(user_request: str) -> str:
-    """Генерирует решение проблемы."""
-    lower = user_request.lower()
-
-    if "пароль" in lower:
-        return (
-            "1. Перейдите в личный кабинет.\n"
-            "2. Нажмите 'Восстановить пароль'.\n"
-            "3. Следуйте инструкции в письме."
-        )
-    elif "wi-fi" in lower or "вайфай" in lower:
-        return (
-            "1. Перезагрузите роутер.\n"
-            "2. Проверьте подключение к сети.\n"
-            "3. Если не помогает — обратитесь в IT-отдел."
-        )
-    elif "почт" in lower:
-        return (
-            "1. Проверьте настройки почтового клиента.\n"
-            "2. Убедитесь, что пароль верный.\n"
-            "3. Попробуйте войти через веб-версию."
-        )
-    elif "вход" in lower:
-        return (
-            "1. Завершите активные сессии в настройках безопасности.\n"
-            "2. Подождите несколько минут.\n"
-            "3. Попробуйте войти с новым паролем."
-        )
-    return "Решение не найдено. Запрос передан в поддержку."
-
-
-# ======================================================
-# ЭНДПОИНТЫ
-# ======================================================
-
-@app.route("/tickets", methods=["POST"])
-def create_ticket():
+def make_summary(message, answers):
     """
-    Создать заявку.
-    Тело запроса: { "request": "текст запроса клиента" }
+    Формируем аккуратное описание проблемы
+    из исходного сообщения и ответов.
     """
-    data = request.get_json()
-    user_request = data.get("request", "").strip()
 
-    if not user_request:
-        return jsonify({"error": "Request is empty"}), 400
+    device = answers[0] if len(answers) > 0 else ""
+    time_info = answers[1] if len(answers) > 1 else ""
+    details = answers[2] if len(answers) > 2 else ""
 
-    ticket_id = str(uuid.uuid4())
-    questions = generate_questions(user_request)
+    parts = [
+        f"Исходная проблема: {message}"
+    ]
 
-    tickets[ticket_id] = {
-        "id": ticket_id,
-        "originalRequest": user_request,
-        "questions": questions,
-        "answers": [],
-        "summary": "",
-        "status": "WAITING_ANSWERS",
-        "solution": "",
-        "escalationReason": ""
+    if device:
+        parts.append(
+            f"Устройство или окружение: {device}"
+        )
+
+    if time_info:
+        parts.append(
+            f"Дополнительная информация: {time_info}"
+        )
+
+    if details:
+        parts.append(
+            f"Проявление проблемы: {details}"
+        )
+
+    return "\n\n".join(parts)
+
+
+def make_solution(message, answers):
+    """
+    Формируем решение в зависимости
+    от категории проблемы.
+    """
+
+    category = detect_category(message)
+
+    if category == "auth":
+        return {
+            "status": "RESOLVED",
+            "solution": [
+                "Проверьте правильность логина и нового пароля.",
+                "Закройте старые активные сессии и повторите вход.",
+                "Перезапустите браузер или приложение.",
+                "Если ошибка сохраняется, очистите кэш браузера и попробуйте войти снова."
+            ]
+        }
+
+    if category == "network":
+        return {
+            "status": "RESOLVED",
+            "solution": [
+                "Проверьте, включён ли Wi-Fi или кабельное подключение.",
+                "Отключитесь от сети и подключитесь к ней повторно.",
+                "Перезапустите браузер и попробуйте открыть другой сайт.",
+                "Если интернет отсутствует на всех сервисах, перезапустите сетевое подключение."
+            ]
+        }
+
+    if category == "vpn":
+        return {
+            "status": "RESOLVED",
+            "solution": [
+                "Убедитесь, что обычное интернет-соединение работает.",
+                "Полностью закройте VPN-клиент.",
+                "Запустите VPN снова и повторно выполните авторизацию.",
+                "Если ошибка остаётся, передайте её текст специалисту поддержки."
+            ]
+        }
+
+    if category == "mail":
+        return {
+            "status": "RESOLVED",
+            "solution": [
+                "Проверьте подключение к интернету и корпоративной сети.",
+                "Закройте и снова откройте почтовое приложение.",
+                "Проверьте, не требуется ли повторная авторизация.",
+                "Если проблема сохраняется, попробуйте открыть почту через браузер."
+            ]
+        }
+
+    if category == "printer":
+        return {
+            "status": "RESOLVED",
+            "solution": [
+                "Убедитесь, что принтер включён и доступен.",
+                "Проверьте, выбран ли правильный принтер.",
+                "Очистите зависшие документы из очереди печати.",
+                "Повторно отправьте документ на печать."
+            ]
+        }
+
+    return {
+        "status": "RESOLVED",
+        "solution": [
+            "Перезапустите программу, в которой возникла проблема.",
+            "Проверьте подключение к интернету или корпоративной сети.",
+            "Повторите действие и запишите точный текст ошибки, если она появится.",
+            "Если проблема сохранится, передайте сформированный запрос специалисту поддержки."
+        ]
     }
 
-    return jsonify(tickets[ticket_id]), 200
+
+# =========================================================
+# HTTP-СЕРВЕР
+# =========================================================
 
 
-@app.route("/tickets/<ticket_id>/answers", methods=["POST"])
-def submit_answers(ticket_id):
-    """
-    Ответить на вопросы.
-    Тело запроса: { "answers": ["ответ1", "ответ2", "ответ3"] }
-    """
-    if ticket_id not in tickets:
-        return jsonify({"error": "Ticket not found"}), 404
+class SberHelpHandler(SimpleHTTPRequestHandler):
 
-    data = request.get_json()
-    answers = data.get("answers", [])
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            *args,
+            directory=str(FRONTEND_DIR),
+            **kwargs
+        )
 
-    ticket = tickets[ticket_id]
-    ticket["answers"] = answers
+    # -----------------------------------------------------
+    # ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    # -----------------------------------------------------
 
-    # Формируем резюме
-    summary = generate_summary(ticket["originalRequest"], answers)
-    ticket["summary"] = summary
-    ticket["status"] = "WAITING_CONFIRM"
+    def send_json(self, data, status=200):
 
-    return jsonify(ticket), 200
+        response = json.dumps(
+            data,
+            ensure_ascii=False
+        ).encode("utf-8")
+
+        self.send_response(status)
+
+        self.send_header(
+            "Content-Type",
+            "application/json; charset=utf-8"
+        )
+
+        self.send_header(
+            "Content-Length",
+            str(len(response))
+        )
+
+        self.end_headers()
+
+        self.wfile.write(response)
+
+    def read_json(self):
+
+        length = int(
+            self.headers.get(
+                "Content-Length",
+                "0"
+            )
+        )
+
+        raw = self.rfile.read(length)
+
+        if not raw:
+            return {}
+
+        return json.loads(
+            raw.decode("utf-8")
+        )
+
+    # -----------------------------------------------------
+    # GET
+    # -----------------------------------------------------
+
+    def do_GET(self):
+
+        path = urlparse(
+            self.path
+        ).path
+
+        # Чтобы http://localhost:8000
+        # автоматически открывал index.html
+
+        if path == "/":
+            self.path = "/index.html"
+
+        super().do_GET()
+
+    # -----------------------------------------------------
+    # POST
+    # -----------------------------------------------------
+
+    def do_POST(self):
+
+        path = urlparse(
+            self.path
+        ).path
+
+        try:
+            data = self.read_json()
+
+        except (
+            json.JSONDecodeError,
+            UnicodeDecodeError,
+            ValueError
+        ):
+
+            self.send_json(
+                {
+                    "success": False,
+                    "error": "Некорректный JSON"
+                },
+                400
+            )
+
+            return
+
+        # =================================================
+        # 1. АНАЛИЗ ПЕРВОГО СООБЩЕНИЯ
+        # =================================================
+
+        if path == "/api/analyze":
+
+            message = str(
+                data.get(
+                    "message",
+                    ""
+                )
+            ).strip()
+
+            if not message:
+
+                self.send_json(
+                    {
+                        "success": False,
+                        "error": "Введите описание проблемы"
+                    },
+                    400
+                )
+
+                return
+
+            questions = get_questions(
+                message
+            )
+
+            self.send_json(
+                {
+                    "success": True,
+                    "questions": questions
+                }
+            )
+
+            return
+
+        # =================================================
+        # 2. ФОРМИРОВАНИЕ ПРОБЛЕМЫ
+        # =================================================
+
+        if path == "/api/summary":
+
+            message = str(
+                data.get(
+                    "message",
+                    ""
+                )
+            ).strip()
+
+            answers = data.get(
+                "answers",
+                []
+            )
+
+            if not isinstance(
+                answers,
+                list
+            ):
+                answers = []
+
+            summary = make_summary(
+                message,
+                answers
+            )
+
+            self.send_json(
+                {
+                    "success": True,
+                    "summary": summary
+                }
+            )
+
+            return
+
+        # =================================================
+        # 3. ПОЛУЧЕНИЕ РЕШЕНИЯ
+        # =================================================
+
+        if path == "/api/solution":
+
+            message = str(
+                data.get(
+                    "message",
+                    ""
+                )
+            ).strip()
+
+            answers = data.get(
+                "answers",
+                []
+            )
+
+            if not isinstance(
+                answers,
+                list
+            ):
+                answers = []
+
+            result = make_solution(
+                message,
+                answers
+            )
+
+            self.send_json(
+                {
+                    "success": True,
+                    **result
+                }
+            )
+
+            return
+
+        # =================================================
+        # НЕИЗВЕСТНЫЙ API-МАРШРУТ
+        # =================================================
+
+        self.send_json(
+            {
+                "success": False,
+                "error": "Маршрут не найден"
+            },
+            404
+        )
+
+    # Убираем лишние сообщения HTTP-сервера
+    # при каждом запросе.
+
+    def log_message(
+        self,
+        format,
+        *args
+    ):
+        print(
+            f"[SberHelp] {self.address_string()} - {format % args}"
+        )
 
 
-@app.route("/tickets/<ticket_id>/confirm", methods=["POST"])
-def confirm_ticket(ticket_id):
-    """
-    Подтвердить или отклонить резюме.
-    Тело запроса: { "confirmed": true } или { "confirmed": false }
-    """
-    if ticket_id not in tickets:
-        return jsonify({"error": "Ticket not found"}), 404
-
-    data = request.get_json()
-    confirmed = data.get("confirmed", False)
-
-    ticket = tickets[ticket_id]
-
-    if confirmed:
-        # Клиент подтвердил, что это его проблема
-        if can_solve(ticket["originalRequest"]):
-            # ИИ может решить
-            solution = generate_solution(ticket["originalRequest"])
-            ticket["solution"] = solution
-            ticket["status"] = "RESOLVED"
-        else:
-            # ИИ не может решить → эскалация
-            ticket["status"] = "ESCALATED"
-            ticket["escalationReason"] = "ИИ не смог решить проблему. Запрос передан в поддержку."
-    else:
-        # Клиент отклонил резюме → эскалация
-        ticket["status"] = "ESCALATED"
-        ticket["escalationReason"] = "Клиент отклонил резюме. ИИ не справился. Передано в поддержку."
-
-    return jsonify(ticket), 200
-
-
-@app.route("/tickets", methods=["GET"])
-def get_all_tickets():
-    """Получить все заявки."""
-    return jsonify(list(tickets.values())), 200
-
-
-@app.route("/tickets/<ticket_id>", methods=["GET"])
-def get_ticket(ticket_id):
-    """Получить одну заявку по ID."""
-    if ticket_id not in tickets:
-        return jsonify({"error": "Ticket not found"}), 404
-    return jsonify(tickets[ticket_id]), 200
-
-
-# ======================================================
+# =========================================================
 # ЗАПУСК
-# ======================================================
+# =========================================================
+
+
+def main():
+
+    if not FRONTEND_DIR.exists():
+
+        print(
+            "ОШИБКА: папка frontend не найдена."
+        )
+
+        print(
+            f"Ожидалась папка: {FRONTEND_DIR}"
+        )
+
+        return
+
+    server = ThreadingHTTPServer(
+        (HOST, PORT),
+        SberHelpHandler
+    )
+
+    print()
+    print(
+        "============================================"
+    )
+    print(
+        "        SberHelp запущен"
+    )
+    print(
+        "============================================"
+    )
+    print()
+    print(
+        f"Откройте в браузере: http://{HOST}:{PORT}"
+    )
+    print()
+    print(
+        "Для остановки сервера нажмите Ctrl + C"
+    )
+    print()
+
+    try:
+
+        server.serve_forever()
+
+    except KeyboardInterrupt:
+
+        print()
+        print(
+            "SberHelp остановлен."
+        )
+
+    finally:
+
+        server.server_close()
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    main()

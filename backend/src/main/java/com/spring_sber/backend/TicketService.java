@@ -11,9 +11,9 @@ public class TicketService {
 
     private final List<Ticket> tickets = new ArrayList<>();
     private final AtomicInteger idCounter = new AtomicInteger(1);
-    private final LlmClient llmClient;
+    private final YandexGptClient llmClient;
 
-    public TicketService(LlmClient llmClient) {
+    public TicketService(YandexGptClient llmClient) {
         this.llmClient = llmClient;
     }
 

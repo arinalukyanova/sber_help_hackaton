@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>SberTech AI Support</title>
+
+    <link
+        rel="stylesheet"
+        href="css/style.css"
+    >
+</head>
+
+
+<body class="login-page">
+
+    <div class="login-wrapper">
+
+        <div class="login-card">
+
+            <div class="brand">
+
+                <img
+                    src="assets/logo.png"
+                    alt="SberTech"
+                    class="brand-logo"
+                    onerror="this.style.display='none'"
+                >
+
+                <div>
+                    <div class="brand-title">
+                        SberTech AI Support
+                    </div>
+
+                    <div class="brand-subtitle">
+                        Интеллектуальный диспетчер обращений
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="login-content">
+
+                <div class="badge">
+                    AI SUPPORT SYSTEM
+                </div>
+
+                <h1>
+                    Добро пожаловать
+                </h1>
+
+                <p>
+                    Система автоматически анализирует обращения,
+                    выделяет несколько проблем, определяет приоритет
+                    и предлагает следующее действие.
+                </p>
+
+
+                <label for="operatorName">
+                    Имя оператора
+                </label>
+
+                <input
+                    id="operatorName"
+                    class="input"
+                    type="text"
+                    placeholder="Например: Анна"
+                >
+
+
+                <button
+                    id="loginButton"
+                    class="primary-button"
+                >
+                    Войти в систему
+                </button>
+
+
+                <p
+                    id="loginError"
+                    class="error-text"
+                ></p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <script src="js/auth.js"></script>
+
+</body>
+
+</html>

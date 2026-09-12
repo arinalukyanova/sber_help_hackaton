@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>SberTech AI Support</title>
+
+    <link
+        rel="stylesheet"
+        href="css/style.css"
+    >
+</head>
+
+
+<body>
+
+    <div class="app-container">
+
+
+        <!-- =========================================
+             ШАПКА
+        ========================================== -->
+
+        <header class="header">
+
+            <div class="brand">
+
+                <img
+                    src="assets/logo.png"
+                    alt="SberTech"
+                    class="brand-logo"
+                    onerror="this.style.display='none'"
+                >
+
+                <div>
+                    <div class="brand-title">
+                        SberTech AI Support
+                    </div>
+
+                    <div class="brand-subtitle">
+                        Интеллектуальный диспетчер обращений
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="header-right">
+
+                <div class="online-status">
+                    <span class="online-dot"></span>
+                    AI Agent активен
+                </div>
+
+                <div
+                    id="operatorName"
+                    class="operator-name"
+                ></div>
+
+            </div>
+
+        </header>
+
+
+
+        <!-- =========================================
+             МЕТРИКИ
+        ========================================== -->
+
+        <section class="metrics">
+
+            <div class="metric-card">
+
+                <div class="metric-label">
+                    Обращений сегодня
+                </div>
+
+                <div class="metric-value">
+                    24
+                </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <div class="metric-label">
+                    Обработано ИИ
+                </div>
+
+                <div class="metric-value">
+                    17
+                </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <div class="metric-label">
+                    Среднее время
+                </div>
+
+                <div class="metric-value">
+                    38 сек.
+                </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <div class="metric-label">
+                    Точность классификации
+                </div>
+
+                <div class="metric-value">
+                    94%
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =========================================
+             ОСНОВНАЯ ЧАСТЬ
+        ========================================== -->
+
+        <main class="main-grid">
+
+
+            <!-- ЛЕВАЯ КОЛОНКА -->
+
+            <section class="panel input-panel">
+
+                <div class="section-title">
+                    Входящее обращение
+                </div>
+
+                <div class="section-description">
+                    Вставьте письмо клиента или
+                    текстовую расшифровку разговора.
+                </div>
+
+
+                <textarea
+                    id="message"
+                    class="message-input"
+                    placeholder="Например: Вчера банкомат не выдал 5000 рублей, но деньги списались. Ещё хотел узнать, почему обслуживание карты стало платным..."
+                ></textarea>
+
+
+                <button
+                    id="analyzeButton"
+                    class="primary-button"
+                >
+                    ✦ Проанализировать обращение
+                </button>
+
+
+                <div class="example-box">
+
+                    <div class="example-title">
+                        Пример для демонстрации
+                    </div>
+
+                    <p>
+                        Мне позвонили из службы безопасности
+                        и попросили назвать код из СМС и
+                        перевести деньги на безопасный счёт.
+                    </p>
+
+                    <button
+                        id="exampleButton"
+                        class="secondary-button"
+                    >
+                        Вставить пример
+                    </button>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- ЦЕНТРАЛЬНАЯ КОЛОНКА -->
+
+            <section class="panel analysis-panel">
+
+                <div class="section-header">
+
+                    <div>
+                        <div class="section-title">
+                            Анализ ИИ
+                        </div>
+
+                        <div class="section-description">
+                            Структурированный результат обработки
+                        </div>
+                    </div>
+
+                    <div
+                        id="problemCounter"
+                        class="counter hidden"
+                    >
+                        0 проблем
+                    </div>
+
+                </div>
+
+
+                <!-- LOADING -->
+
+                <div
+                    id="loading"
+                    class="loading hidden"
+                >
+
+                    <div class="spinner"></div>
+
+                    <div>
+                        ИИ анализирует обращение...
+                    </div>
+
+                </div>
+
+
+                <!-- ПУСТОЕ СОСТОЯНИЕ -->
+
+                <div
+                    id="emptyState"
+                    class="empty-state"
+                >
+
+                    <div class="empty-icon">
+                        ✦
+                    </div>
+
+                    <h3>
+                        Результат появится здесь
+                    </h3>
+
+                    <p>
+                        Введите обращение клиента слева
+                        и запустите анализ.
+                    </p>
+
+                </div>
+
+
+                <!-- ОШИБКА -->
+
+                <div
+                    id="errorBox"
+                    class="error-box hidden"
+                ></div>
+
+
+                <!-- КАРТОЧКИ -->
+
+                <div id="results"></div>
+
+            </section>
+
+
+
+            <!-- ПРАВАЯ КОЛОНКА -->
+
+            <section class="panel action-panel">
+
+                <div class="section-title">
+                    Действия агента
+                </div>
+
+                <div class="section-description">
+                    Следующие шаги по обращению
+                </div>
+
+
+                <div
+                    id="actionsEmpty"
+                    class="empty-action"
+                >
+                    После анализа здесь появятся
+                    рекомендуемые действия.
+                </div>
+
+
+                <div id="actions"></div>
+
+            </section>
+
+        </main>
+
+    </div>
+
+
+    <script src="js/chat.js"></script>
+
+</body>
+
+</html>

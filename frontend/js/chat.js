@@ -175,7 +175,7 @@ function renderStart() {
                         id="problemInput"
                         class="large-textarea"
                         placeholder="Опишите вашу проблему..."
-                    ></textarea>
+                    >Не могу войти в рабочий аккаунт. Ввожу пароль, но система не пускает. Что делать?</textarea>
 
                     <div class="input-plus">
                         +
@@ -366,17 +366,13 @@ function renderAnalysis() {
                     </div>
 
 
-                    <div
-                        class="analysis-row muted-analysis"
-                    >
+                    <div class="analysis-row muted-analysis">
 
-                        <span
-                            class="loader-dot"
-                        ></span>
+                        <span class="analysis-circle"></span>
 
-                        <span>
-                            Готовим уточняющие вопросы
-                        </span>
+                            <span>
+                                Готовим уточняющие вопросы
+                            </span>
 
                     </div>
 
@@ -397,21 +393,16 @@ function renderAnalysis() {
 
 function renderQuestion() {
 
-    const index =
-        state.currentQuestion;
+    const index = state.currentQuestion;
 
-
-    const question =
-        state.questions[index];
+    const question = questions[index];
 
 
     if (!question) {
 
-        showError(
-            "Не удалось получить вопрос"
+        renderBackendError(
+            "Backend не вернул уточняющий вопрос."
         );
-
-        resetApplication();
 
         return;
     }
@@ -421,31 +412,15 @@ function renderQuestion() {
 
         <section class="page fade-in">
 
-            <div
-                class="page-content question-page"
-            >
-
-                <div class="question-counter">
-                    Вопрос ${index + 1}/${state.questions.length}
-                </div>
-
+            <div class="page-content question-page">
 
                 <h1 class="page-title">
-                    Нужно немного уточнить
+                    Нужно немного<br>
+                    уточнить
                 </h1>
 
 
-                <p class="page-description">
-                    Ответ поможет точнее определить
-                    причину проблемы.
-                </p>
-
-
                 <div class="question-card">
-
-                    <div class="question-label">
-                        Вопрос
-                    </div>
 
                     <div class="question-text">
                         ${escapeHtml(question.title)}
@@ -457,12 +432,8 @@ function renderQuestion() {
                 <textarea
                     id="questionAnswer"
                     class="question-textarea"
-                    placeholder="${escapeHtml(
-                        question.placeholder || ""
-                    )}"
-                >${escapeHtml(
-                    state.answers[index] || ""
-                )}</textarea>
+                    placeholder="Введите ваш ответ..."
+                >${escapeHtml(state.answers[index] || "")}</textarea>
 
 
                 <button
@@ -470,7 +441,6 @@ function renderQuestion() {
                     class="main-button question-button"
                 >
                     Продолжить
-                    <span>→</span>
                 </button>
 
             </div>
@@ -481,20 +451,16 @@ function renderQuestion() {
 
 
     const answerInput =
-        document.getElementById(
-            "questionAnswer"
-        );
+        document.getElementById("questionAnswer");
 
 
     const continueButton =
-        document.getElementById(
-            "continueButton"
-        );
+        document.getElementById("continueButton");
 
 
     continueButton.addEventListener(
         "click",
-        async () => {
+        () => {
 
             const answer =
                 answerInput.value.trim();
@@ -512,62 +478,21 @@ function renderQuestion() {
             }
 
 
-            state.answers[index] =
-                answer;
+            state.answers[index] = answer;
 
 
             if (
                 state.currentQuestion <
-                state.questions.length - 1
+                questions.length - 1
             ) {
 
                 state.currentQuestion++;
 
                 renderQuestion();
 
-                return;
-            }
+            } else {
 
-
-            renderPreparingSummary();
-
-
-            try {
-
-                const data =
-                    await apiRequest(
-                        "/api/summary",
-                        {
-                            message:
-                                state.initialMessage,
-
-                            answers:
-                                state.answers
-                        }
-                    );
-
-
-                state.summary =
-                    data.summary;
-
-
-                renderConfirmation();
-
-
-            } catch (error) {
-
-                console.error(
-                    error
-                );
-
-
-                showError(
-                    "Не удалось сформировать запрос: " +
-                    error.message
-                );
-
-
-                renderQuestion();
+                loadConfirmation();
             }
         }
     );
@@ -583,7 +508,6 @@ function renderQuestion() {
         }
     );
 }
-
 
 // ======================================================
 // ПОДГОТОВКА SUMMARY
@@ -1096,8 +1020,7 @@ function renderSupport() {
 
 
                     <div class="support-row">
-                        ✓
-                        Контекст обращения
+                        ✓ Скриншоты и вложения (если были)
                     </div>
 
 
